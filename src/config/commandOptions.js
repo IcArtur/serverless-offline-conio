@@ -131,8 +131,13 @@ export default {
     usage:
       'Set WebSocket idle timeout in seconds to reproduce AWS limits (https://docs.aws.amazon.com/apigateway/latest/developerguide/limits.html#apigateway-execution-service-websocket-limits-table). Default: 600 (10 minutes).',
   },
-  websocketPort: {
-    type: 'string',
-    usage: 'Websocket port to listen on. Default: 3001.',
+  dockerOptions: {
+    usage: 'Additional options in case of useDocker',
+  },
+  functionCleanupIdleTimeSeconds: {
+    usage: 'Number of seconds until an idle function is eligible for cleanup',
+  },
+  allowCache: {
+    usage: 'Allows the code of lambda functions to cache if supported',
   },
 }

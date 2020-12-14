@@ -91,6 +91,9 @@ export default class DockerContainer {
       '-e',
       'DOCKER_LAMBDA_WATCH=1', // Watch mode
     ]
+    if (this.#dockerOptions.dockerOptions) {
+      dockerArgs.push(...this.#dockerOptions.dockerOptions)
+    }
 
     if (this.#layers.length > 0) {
       log.verbose(`Found layers, checking provider type`)
