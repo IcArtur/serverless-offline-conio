@@ -221,5 +221,9 @@
   },
   "peerDependencies": {
     "serverless": "^3.2.0"
+  },
+  "directories": {
+    "example": "examples",
+    "test": "tests"
   }
 }
