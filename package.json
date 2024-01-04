@@ -1,7 +1,7 @@
 {
   "dedicatedTo": "Blue, a great migrating bird.",
-  "name": "@conio/serverless-offline",
-  "version": "3.0.0",
+  "name": "serverless-offline-conio",
+  "version": "0.0.6",
   "description": "Emulate AWS λ and API Gateway locally when developing your Serverless project",
   "license": "MIT",
   "exports": {
@@ -9,19 +9,6 @@
     "./lambda": "./src/lambda/index.js"
   },
   "type": "module",
-  "scripts": {
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "list-contributors": "echo 'clone https://github.com/mgechev/github-contributors-list.git first, then run npm install' && cd ../github-contributors-list && node bin/githubcontrib --owner dherault --repo serverless-offline --sortBy contributions --showlogin true --sortOrder desc > contributors.md",
-    "prepare-release": "commit-and-tag-version && prettier --write CHANGELOG.md",
-    "prepublishOnly": "npm run lint",
-    "prettier": "prettier --check .",
-    "prettier:fix": "prettier --write .",
-    "test": "mocha --require ./tests/mochaHooks.cjs",
-    "test:cov": "NODE_OPTIONS='--experimental-loader @istanbuljs/esm-loader-hook' nyc --reporter=html npm test",
-    "test:node": "TEST=unit mocha --require ./tests/mochaHooks.cjs",
-    "test:unit": "TEST=unit mocha --require ./tests/mochaHooks.cjs"
-  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dherault/serverless-offline.git"
@@ -45,6 +32,7 @@
     "websocket"
   ],
   "files": [
+    "src/**",
     "dist/**",
     "package.json",
     "LICENSE",
