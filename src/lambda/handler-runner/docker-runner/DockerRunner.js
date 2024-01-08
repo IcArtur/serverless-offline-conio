@@ -13,6 +13,7 @@ export default class DockerRunner {
       handler,
       runtime,
       layers,
+      layersConfig,
       provider,
       servicePath,
     } = funOptions
@@ -35,6 +36,7 @@ export default class DockerRunner {
       handler,
       runtime,
       layers,
+      layersConfig,
       provider,
       servicePath,
       dockerOptions,

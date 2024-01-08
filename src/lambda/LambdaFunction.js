@@ -144,6 +144,7 @@ export default class LambdaFunction {
         : undefined,
       handler,
       layers: functionDefinition.layers || [],
+      layersConfig: service.layers,
       provider,
       runtime: this.#runtime,
       serverlessPath,

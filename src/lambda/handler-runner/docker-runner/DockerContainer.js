@@ -10,9 +10,9 @@ import {
 } from '@aws-sdk/client-lambda'
 import { log, progress } from '@serverless/utils/log.js'
 import { execa } from 'execa'
-import { ensureDir, pathExists } from 'fs-extra'
 import { promisify } from 'node:util'
 import { pipeline } from 'node:stream'
+import copySync, { ensureDir, pathExists } from 'fs-extra'
 import isWsl from 'is-wsl'
 import jszip from 'jszip'
 import pRetry from 'p-retry'
@@ -42,6 +42,8 @@ export default class DockerContainer {
 
   #layers = null
 
+  #layersConfig = null
+
   #port = null
 
   #provider = null
@@ -56,6 +58,7 @@ export default class DockerContainer {
     handler,
     runtime,
     layers,
+    layersConfig,
     provider,
     servicePath,
     dockerOptions,
@@ -67,13 +70,14 @@ export default class DockerContainer {
     this.#imageNameTag = this.#baseImage(runtime)
     this.#image = new DockerImage(this.#imageNameTag)
     this.#layers = layers
+    this.#layersConfig = layersConfig
     this.#provider = provider
     this.#runtime = runtime
     this.#servicePath = servicePath
   }
 
   #baseImage(runtime) {
-    return `public.ecr.aws/sam/build-python3.11:latest`
+    return 'public.ecr.aws/sam/build-python3.11:latest'
   }
 
   async start(codeDir) {
@@ -127,14 +131,19 @@ export default class DockerContainer {
           })
 
           log.verbose(`Getting layers`)
-
           await Promise.all(
-            this.#layers.map((layerArn) =>
-              this.#downloadLayer(layerArn, layerDir),
-            ),
+            this.#layers.map((layerArn) => {
+              const isLayerArn =
+                typeof layerArn === 'string' && layerArn.includes(':layer:')
+
+              return isLayerArn
+                ? this.#downloadLayer(layerArn, layerDir)
+                : this.#copyLocalLayer(layerArn, layerDir)
+            }),
           )
         }
 
+        console.log("Local layer copied")
         if (
           this.#dockerOptions.hostServicePath &&
           layerDir.startsWith(this.#servicePath)
@@ -175,7 +184,8 @@ export default class DockerContainer {
       this.#imageNameTag,
       this.#handler,
     ])
-
+    console.log(containerId)
+    console.log(dockerArgs)
     const dockerStart = execa('docker', ['start', '-a', containerId], {
       all: true,
     })
@@ -185,12 +195,16 @@ export default class DockerContainer {
         const str = String(data)
         log.error(str)
 
+        console.log("Container 'data' event fired")
+        console.log(str)
         if (str.includes('Lambda API listening on port')) {
           resolve()
         }
       })
 
       dockerStart.on('error', (err) => {
+        console.log("Container error event fired")
+        console.log(err)
         reject(err)
       })
     })
@@ -359,6 +373,23 @@ export default class DockerContainer {
     } finally {
       layerProgress.remove()
     }
+  }
+
+  async #copyLocalLayer(layerDef, layerDir) {
+    const layerRef = layerDef.Ref.split('LambdaLayer')[0]
+    const layerConfig = this.#layersConfig[layerRef]
+
+    if (
+      !Array.isArray(layerConfig.compatibleRuntimes) ||
+      !layerConfig.compatibleRuntimes.includes(this.#runtime)
+    ) {
+      return
+    }
+
+    console.log(`Ensuring this directory exist ${layerDir}`)
+    await ensureDir(layerDir)
+    console.log(`Moving this path ${layerConfig.path} inside ${layerDir}`)
+    copySync.copySync(layerConfig.path, layerDir, { recursive: true })
   }
 
   async #getBridgeGatewayIp() {
