@@ -147,6 +147,7 @@ export default class LambdaFunction {
       provider,
       runtime: this.#runtime,
       serverlessPath,
+      serviceLayers: service.layers,
       servicePackage: servicePackage.artifact
         ? resolve(servicepath, servicePackage.artifact)
         : undefined,

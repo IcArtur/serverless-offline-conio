@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 import { platform } from 'node:os'
-import { dirname, join, sep } from 'node:path'
+import { dirname, join, sep, resolve as pathResolve } from 'node:path'
 import { LambdaClient, GetLayerVersionCommand } from '@aws-sdk/client-lambda'
 import { log, progress } from '@serverless/utils/log.js'
 import { execa } from 'execa'
-import { ensureDir, pathExists } from 'fs-extra'
+import pkg from 'fs-extra'
 import isWsl from 'is-wsl'
 import jszip from 'jszip'
 import pRetry from 'p-retry'
@@ -16,6 +16,7 @@ const { stringify } = JSON
 const { floor, log: mathLog } = Math
 const { parseFloat } = Number
 const { entries, hasOwn } = Object
+const { mkdirSync, copySync, ensureDir, pathExists } = pkg
 
 export default class DockerContainer {
   #containerId = null
@@ -44,6 +45,8 @@ export default class DockerContainer {
 
   #servicePath = null
 
+  #serviceLayers = null
+
   constructor(
     env,
     functionKey,
@@ -53,6 +56,7 @@ export default class DockerContainer {
     provider,
     servicePath,
     dockerOptions,
+    serviceLayers,
   ) {
     this.#dockerOptions = dockerOptions
     this.#env = env
@@ -64,10 +68,11 @@ export default class DockerContainer {
     this.#provider = provider
     this.#runtime = runtime
     this.#servicePath = servicePath
+    this.#serviceLayers = serviceLayers
   }
 
   #baseImage(runtime) {
-    return `lambci/lambda:${runtime}`
+    return `public.ecr.aws/lambda/python:${runtime.replace('python', '')}`
   }
 
   async start(codeDir) {
@@ -120,9 +125,18 @@ export default class DockerContainer {
           log.verbose(`Getting layers`)
 
           await Promise.all(
-            this.#layers.map((layerArn) =>
-              this.#downloadLayer(layerArn, layerDir),
-            ),
+            this.#layers.forEach((layerArn) => {
+              log.verbose(`Getting layer ${JSON.stringify(layerArn)}`)
+              if (
+                typeof layerArn === 'string' &&
+                layerArn.includes(':layer:')
+              ) {
+                console.log(`Using download instead of copy: ${layerArn}`)
+                this.#downloadLayer(layerArn, layerDir)
+              } else {
+                this.#copyLocalLayer(layerArn, layerDir)
+              }
+            }),
           )
         }
 
@@ -135,7 +149,7 @@ export default class DockerContainer {
             this.#dockerOptions.hostServicePath,
           )
         }
-        dockerArgs.push('-v', `${layerDir}:/opt:ro,delegated`)
+        dockerArgs.push('-v', `${pathResolve(layerDir)}:/opt:ro,delegated`)
       } else {
         log.warning(
           `Provider ${this.#provider.name} is Unsupported. Layers are only supported on aws.`,
@@ -220,6 +234,41 @@ export default class DockerContainer {
       minTimeout: 10,
       // default
       retries: 10,
+    })
+  }
+
+  async #copyLocalLayer(layerArn, layerDir) {
+    const layerName = layerArn.Ref
+    const serviceLayerName = layerName.replace('LambdaLayer', '')
+    const serviceLayer = this.#serviceLayers[serviceLayerName]
+    const layerDataLocation = pathResolve(serviceLayer.path)
+
+    log.verbose(`[${layerName}] Location: ${layerDataLocation}`)
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        serviceLayer,
+        'CompatibleRuntimes',
+      ) &&
+      !serviceLayer.CompatibleRuntimes.includes(this.#runtime)
+    ) {
+      log.warning(
+        `[${layerName}] Layer is not compatible with ${this.#runtime} runtime`,
+      )
+      return
+    }
+
+    log.verbose(`
+      [${layerName}] Copying data from ${layerDataLocation} to ${layerDir}...`)
+
+    mkdirSync(layerDir, { recursive: true })
+    copySync(layerDataLocation, layerDir, { recursive: true }, function (err) {
+      if (err) {
+        log.verbose(`[${layerName}] ERROR`)
+        console.error(err)
+      } else {
+        log.verbose(`[${layerName}] Done`)
+      }
     })
   }
 

@@ -15,6 +15,7 @@ export default class DockerRunner {
       layers,
       provider,
       servicePath,
+      serviceLayers,
     } = funOptions
 
     this.#codeDir = codeDir
@@ -38,6 +39,7 @@ export default class DockerRunner {
       provider,
       servicePath,
       dockerOptions,
+      serviceLayers,
     )
   }
 

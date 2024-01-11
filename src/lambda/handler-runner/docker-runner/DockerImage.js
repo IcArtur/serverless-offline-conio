@@ -19,7 +19,7 @@ export default class DockerImage {
     try {
       await execa('docker', [
         'pull',
-        '--disable-content-trust=false',
+        // '--disable-content-trust=false',
         imageNameTag,
       ])
     } catch (err) {
