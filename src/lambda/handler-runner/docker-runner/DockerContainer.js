@@ -2,17 +2,11 @@ import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 import { platform } from 'node:os'
-import { dirname, join, sep } from 'node:path'
-import {
-  LambdaClient,
-  GetLayerVersionByArnCommand,
-  ListLayerVersionsCommand,
-} from '@aws-sdk/client-lambda'
+import { dirname, join, sep, resolve as pathResolve } from 'node:path'
+import { LambdaClient, GetLayerVersionCommand } from '@aws-sdk/client-lambda'
 import { log, progress } from '@serverless/utils/log.js'
 import { execa } from 'execa'
-import { promisify } from 'node:util'
-import { pipeline } from 'node:stream'
-import copySync, { ensureDir, pathExists } from 'fs-extra'
+import pkg from 'fs-extra'
 import isWsl from 'is-wsl'
 import jszip from 'jszip'
 import pRetry from 'p-retry'
@@ -22,6 +16,7 @@ const { stringify } = JSON
 const { floor, log: mathLog } = Math
 const { parseFloat } = Number
 const { entries, hasOwn } = Object
+const { mkdirSync, copySync, ensureDir, pathExists } = pkg
 
 export default class DockerContainer {
   #containerId = null
@@ -42,8 +37,6 @@ export default class DockerContainer {
 
   #layers = null
 
-  #layersConfig = null
-
   #port = null
 
   #provider = null
@@ -52,16 +45,18 @@ export default class DockerContainer {
 
   #servicePath = null
 
+  #serviceLayers = null
+
   constructor(
     env,
     functionKey,
     handler,
     runtime,
     layers,
-    layersConfig,
     provider,
     servicePath,
     dockerOptions,
+    serviceLayers,
   ) {
     this.#dockerOptions = dockerOptions
     this.#env = env
@@ -70,14 +65,14 @@ export default class DockerContainer {
     this.#imageNameTag = this.#baseImage(runtime)
     this.#image = new DockerImage(this.#imageNameTag)
     this.#layers = layers
-    this.#layersConfig = layersConfig
     this.#provider = provider
     this.#runtime = runtime
     this.#servicePath = servicePath
+    this.#serviceLayers = serviceLayers
   }
 
   #baseImage(runtime) {
-    return 'public.ecr.aws/sam/build-python3.11:latest'
+    return `public.ecr.aws/lambda/python:${runtime.replace('python', '')}`
   }
 
   async start(codeDir) {
@@ -101,9 +96,6 @@ export default class DockerContainer {
       '-e',
       'DOCKER_LAMBDA_WATCH=1', // Watch mode
     ]
-    if (this.#dockerOptions.dockerOptions) {
-      dockerArgs.push(...this.#dockerOptions.dockerOptions)
-    }
 
     if (this.#layers.length > 0) {
       log.verbose(`Found layers, checking provider type`)
@@ -131,19 +123,23 @@ export default class DockerContainer {
           })
 
           log.verbose(`Getting layers`)
-          await Promise.all(
-            this.#layers.map((layerArn) => {
-              const isLayerArn =
-                typeof layerArn === 'string' && layerArn.includes(':layer:')
 
-              return isLayerArn
-                ? this.#downloadLayer(layerArn, layerDir)
-                : this.#copyLocalLayer(layerArn, layerDir)
+          await Promise.all(
+            this.#layers.forEach((layerArn) => {
+              log.verbose(`Getting layer ${JSON.stringify(layerArn)}`)
+              if (
+                typeof layerArn === 'string' &&
+                layerArn.includes(':layer:')
+              ) {
+                console.log(`Using download instead of copy: ${layerArn}`)
+                this.#downloadLayer(layerArn, layerDir)
+              } else {
+                this.#copyLocalLayer(layerArn, layerDir)
+              }
             }),
           )
         }
 
-        console.log("Local layer copied")
         if (
           this.#dockerOptions.hostServicePath &&
           layerDir.startsWith(this.#servicePath)
@@ -153,7 +149,7 @@ export default class DockerContainer {
             this.#dockerOptions.hostServicePath,
           )
         }
-        dockerArgs.push('-v', `${layerDir}:/opt:ro,delegated`)
+        dockerArgs.push('-v', `${pathResolve(layerDir)}:/opt:ro,delegated`)
       } else {
         log.warning(
           `Provider ${this.#provider.name} is Unsupported. Layers are only supported on aws.`,
@@ -184,8 +180,7 @@ export default class DockerContainer {
       this.#imageNameTag,
       this.#handler,
     ])
-    console.log(containerId)
-    console.log(dockerArgs)
+
     const dockerStart = execa('docker', ['start', '-a', containerId], {
       all: true,
     })
@@ -195,16 +190,12 @@ export default class DockerContainer {
         const str = String(data)
         log.error(str)
 
-        console.log("Container 'data' event fired")
-        console.log(str)
         if (str.includes('Lambda API listening on port')) {
           resolve()
         }
       })
 
       dockerStart.on('error', (err) => {
-        console.log("Container error event fired")
-        console.log(err)
         reject(err)
       })
     })
@@ -246,58 +237,60 @@ export default class DockerContainer {
     })
   }
 
+  async #copyLocalLayer(layerArn, layerDir) {
+    const layerName = layerArn.Ref
+    const serviceLayerName = layerName.replace('LambdaLayer', '')
+    const serviceLayer = this.#serviceLayers[serviceLayerName]
+    const layerDataLocation = pathResolve(serviceLayer.path)
+
+    log.verbose(`[${layerName}] Location: ${layerDataLocation}`)
+
+    if (
+      Object.prototype.hasOwnProperty.call(
+        serviceLayer,
+        'CompatibleRuntimes',
+      ) &&
+      !serviceLayer.CompatibleRuntimes.includes(this.#runtime)
+    ) {
+      log.warning(
+        `[${layerName}] Layer is not compatible with ${this.#runtime} runtime`,
+      )
+      return
+    }
+
+    log.verbose(`
+      [${layerName}] Copying data from ${layerDataLocation} to ${layerDir}...`)
+
+    mkdirSync(layerDir, { recursive: true })
+    copySync(layerDataLocation, layerDir, { recursive: true }, function (err) {
+      if (err) {
+        log.verbose(`[${layerName}] ERROR`)
+        console.error(err)
+      } else {
+        log.verbose(`[${layerName}] Done`)
+      }
+    })
+  }
+
   async #downloadLayer(layerArn, layerDir) {
-    const [, layerId] = layerArn.split(':layer:')
-    const [layerName, layerVersion] = layerId.split(':')
+    const [, layerName] = layerArn.split(':layer:')
     const layerZipFile = `${layerDir}/${layerName}.zip`
     const layerProgress = progress.get(`layer-${layerName}`)
 
-    log.verbose(`[${layerName}][${layerVersion}] ARN: ${layerArn}`)
+    log.verbose(`[${layerName}] ARN: ${layerArn}`)
 
     log.verbose(`[${layerName}] Getting Info`)
     layerProgress.notice(`Retrieving "${layerName}": Getting info`)
 
-    let listLayerVersionsCommand = null
-    try {
-      if (layerVersion.toLowerCase() === 'latest') {
-        listLayerVersionsCommand = new ListLayerVersionsCommand({
-          LayerName: layerArn.split(':').slice(0, -1).join(':'),
-        })
-      }
-    } catch (err) {
-      log.error(err.stderr)
-
-      throw err
-    }
-
-    let parsedLayerArn
-
-    if (listLayerVersionsCommand) {
-      try {
-        const layers = await this.#lambdaClient.send(listLayerVersionsCommand)
-        const latestLayer = layers.LayerVersions.reduce((a, b) =>
-          a.CreatedDate > b.CreatedDate ? a : b,
-        )
-        parsedLayerArn = latestLayer.LayerVersionArn
-        log.verbose(`Parsed Layer ARN: [${parsedLayerArn}]`)
-      } catch (err) {
-        log.error(err.stderr)
-
-        throw err
-      }
-    } else {
-      parsedLayerArn = layerArn
-    }
-
-    const getLayerVersionByArnCommand = new GetLayerVersionByArnCommand({
-      Arn: parsedLayerArn,
+    const getLayerVersionCommand = new GetLayerVersionCommand({
+      LayerName: layerArn,
     })
 
     try {
       let layer = null
 
       try {
-        layer = await this.#lambdaClient.send(getLayerVersionByArnCommand)
+        layer = await this.#lambdaClient.send(getLayerVersionCommand)
       } catch (err) {
         log.warning(`[${layerName}] ${err.code}: ${err.message}`)
 
@@ -341,10 +334,17 @@ export default class DockerContainer {
         return
       }
 
-      const streamPipeline = promisify(pipeline)
       const fileStream = createWriteStream(layerZipFile)
 
-      await streamPipeline(res.body, fileStream)
+      await new Promise((resolve, reject) => {
+        res.body.pipe(fileStream)
+        res.body.on('error', (err) => {
+          reject(err)
+        })
+        fileStream.on('finish', () => {
+          resolve()
+        })
+      })
 
       log.verbose(`Retrieving "${layerName}": Unzipping to .layers directory`)
       layerProgress.notice(
@@ -373,23 +373,6 @@ export default class DockerContainer {
     } finally {
       layerProgress.remove()
     }
-  }
-
-  async #copyLocalLayer(layerDef, layerDir) {
-    const layerRef = layerDef.Ref.split('LambdaLayer')[0]
-    const layerConfig = this.#layersConfig[layerRef]
-
-    if (
-      !Array.isArray(layerConfig.compatibleRuntimes) ||
-      !layerConfig.compatibleRuntimes.includes(this.#runtime)
-    ) {
-      return
-    }
-
-    console.log(`Ensuring this directory exist ${layerDir}`)
-    await ensureDir(layerDir)
-    console.log(`Moving this path ${layerConfig.path} inside ${layerDir}`)
-    copySync.copySync(layerConfig.path, layerDir, { recursive: true })
   }
 
   async #getBridgeGatewayIp() {
