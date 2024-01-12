@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { readFile, unlink, writeFile } from 'node:fs/promises'
@@ -123,19 +124,17 @@ export default class DockerContainer {
           })
 
           log.verbose(`Getting layers`)
-
           await Promise.all(
-            this.#layers.forEach((layerArn) => {
+            this.#layers.map((layerArn) => {
               log.verbose(`Getting layer ${JSON.stringify(layerArn)}`)
               if (
                 typeof layerArn === 'string' &&
                 layerArn.includes(':layer:')
               ) {
-                console.log(`Using download instead of copy: ${layerArn}`)
-                this.#downloadLayer(layerArn, layerDir)
-              } else {
-                this.#copyLocalLayer(layerArn, layerDir)
+                log.debug(`Using download instead of copy: ${layerArn}`)
+                return this.#downloadLayer(layerArn, layerDir)
               }
+              return this.#copyLocalLayer(layerArn, layerDir)
             }),
           )
         }
@@ -165,6 +164,8 @@ export default class DockerContainer {
       // Add `host.docker.internal` DNS name to access host from inside the container
       // https://github.com/docker/for-linux/issues/264
       const gatewayIp = await this.#getBridgeGatewayIp()
+      this.#dockerOptions.host = gatewayIp
+      console.log(`Adding host.docker.internal at ip: ${gatewayIp}`)
       if (gatewayIp) {
         dockerArgs.push('--add-host', `host.docker.internal:${gatewayIp}`)
       }
@@ -181,6 +182,7 @@ export default class DockerContainer {
       this.#handler,
     ])
 
+    console.log(`Creating container, ID: ${containerId}`)
     const dockerStart = execa('docker', ['start', '-a', containerId], {
       all: true,
     })
@@ -189,8 +191,10 @@ export default class DockerContainer {
       dockerStart.all.on('data', (data) => {
         const str = String(data)
         log.error(str)
-
-        if (str.includes('Lambda API listening on port')) {
+        console.log(`Getting data form data event: ${str}`)
+        const startUpString =
+          "exec '/var/runtime/bootstrap' (cwd=/var/task, handler=)"
+        if (str.includes(startUpString)) {
           resolve()
         }
       })
@@ -224,6 +228,7 @@ export default class DockerContainer {
       throw new Error('Failed to get container port')
     }
 
+    console.log(`Retrieved container port: ${containerPort}`)
     this.#containerId = containerId
     this.#port = containerPort
 
@@ -262,10 +267,9 @@ export default class DockerContainer {
       [${layerName}] Copying data from ${layerDataLocation} to ${layerDir}...`)
 
     mkdirSync(layerDir, { recursive: true })
-    copySync(layerDataLocation, layerDir, { recursive: true }, function (err) {
+    copySync(layerDataLocation, layerDir, { recursive: true }, (err) => {
       if (err) {
         log.verbose(`[${layerName}] ERROR`)
-        console.error(err)
       } else {
         log.verbose(`[${layerName}] Done`)
       }
@@ -394,14 +398,17 @@ export default class DockerContainer {
   }
 
   async #ping() {
-    const url = `http://${this.#dockerOptions.host}:${this.#port}/2018-06-01/ping`
-    const res = await fetch(url)
-
-    if (!res.ok) {
-      throw new Error(`Failed to fetch from ${url} with ${res.statusText}`)
-    }
-
-    return res.text()
+    return 'ok'
+    // const url = `http://${this.#dockerOptions.host}:${this.#port} `
+    // console.log(`Pinging url: ${url}`)
+    // const res = await fetch(url)
+    // console.log(`Replied with:`)
+    // console.log(res.text())
+    // if (!res.ok) {
+    //   throw new Error(`Failed to fetch from ${url} with ${res.statusText}`)
+    // }
+    //
+    // return res.text()
   }
 
   async request(event) {

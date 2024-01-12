@@ -8,6 +8,7 @@ export default {
   dockerHost: 'localhost',
   dockerHostServicePath: null,
   dockerNetwork: null,
+  dockerOptions: [],
   dockerReadOnly: true,
   enforceSecureCookies: false,
   host: 'localhost',
@@ -28,5 +29,4 @@ export default {
   webSocketHardTimeout: 7200,
   webSocketIdleTimeout: 600,
   websocketPort: 3001,
-  dockerOptions: [],
 }

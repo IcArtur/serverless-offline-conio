@@ -3,6 +3,9 @@ export default {
     type: 'string',
     usage: 'ALB port to listen on. Default: 3003.',
   },
+  allowCache: {
+    usage: 'Allows the code of lambda functions to cache if supported',
+  },
   corsAllowHeaders: {
     type: 'string',
     usage:
@@ -40,6 +43,9 @@ export default {
     type: 'string',
     usage: 'The network that the Docker container will connect to.',
   },
+  dockerOptions: {
+    usage: 'Additional options in case of useDocker',
+  },
   dockerReadOnly: {
     type: 'boolean',
     usage: 'Marks if the docker code layer should be read only. Default: true.',
@@ -47,6 +53,9 @@ export default {
   enforceSecureCookies: {
     type: 'boolean',
     usage: 'Enforce secure cookies.',
+  },
+  functionCleanupIdleTimeSeconds: {
+    usage: 'Number of seconds until an idle function is eligible for cleanup',
   },
   host: {
     shortcut: 'o',
@@ -130,14 +139,5 @@ export default {
     type: 'string',
     usage:
       'Set WebSocket idle timeout in seconds to reproduce AWS limits (https://docs.aws.amazon.com/apigateway/latest/developerguide/limits.html#apigateway-execution-service-websocket-limits-table). Default: 600 (10 minutes).',
-  },
-  dockerOptions: {
-    usage: 'Additional options in case of useDocker',
-  },
-  functionCleanupIdleTimeSeconds: {
-    usage: 'Number of seconds until an idle function is eligible for cleanup',
-  },
-  allowCache: {
-    usage: 'Allows the code of lambda functions to cache if supported',
   },
 }
