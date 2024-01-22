@@ -1,7 +1,7 @@
 {
   "dedicatedTo": "Blue, a great migrating bird.",
   "name": "@conio/serverless-offline",
-  "version": "13.3.14-rc1",
+  "version": "13.3.14-rc13",
   "description": "Emulate AWS λ and API Gateway locally when developing your Serverless project",
   "license": "MIT",
   "exports": {
@@ -111,9 +111,9 @@
     "mocha": "^10.2.0",
     "nyc": "^15.1.0",
     "prettier": "^3.1.1",
-    "serverless": "^3.38.0"
+    "serverless": "^3.34.0"
   },
   "peerDependencies": {
-    "serverless": "^3.38.0"
+    "serverless": "^3.34.0"
   }
 }

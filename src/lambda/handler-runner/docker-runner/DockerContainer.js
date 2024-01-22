@@ -1,16 +1,15 @@
-/* eslint-disable no-console */
 import { createHash } from 'node:crypto'
 import { createWriteStream } from 'node:fs'
 import { readFile, unlink, writeFile } from 'node:fs/promises'
 import { platform } from 'node:os'
 import { dirname, join, sep, resolve as pathResolve } from 'node:path'
+import process from 'node:process'
 import { LambdaClient, GetLayerVersionCommand } from '@aws-sdk/client-lambda'
 import { log, progress } from '@serverless/utils/log.js'
 import { execa } from 'execa'
 import pkg from 'fs-extra'
 import isWsl from 'is-wsl'
 import jszip from 'jszip'
-import pRetry from 'p-retry'
 import DockerImage from './DockerImage.js'
 
 const { stringify } = JSON
@@ -27,6 +26,8 @@ export default class DockerContainer {
   #env = null
 
   #functionKey = null
+
+  #gatewayAddress = null
 
   #handler = null
 
@@ -62,6 +63,7 @@ export default class DockerContainer {
     this.#dockerOptions = dockerOptions
     this.#env = env
     this.#functionKey = functionKey
+    this.#gatewayAddress = process.env.GATEWAY_ADDRESS
     this.#handler = handler
     this.#imageNameTag = this.#baseImage(runtime)
     this.#image = new DockerImage(this.#imageNameTag)
@@ -91,7 +93,9 @@ export default class DockerContainer {
       '-v',
       `${codeDir}:/var/task:${permissions},delegated`,
       '-p',
-      9001,
+      8080,
+      '-e',
+      'PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python',
       '-e',
       'DOCKER_LAMBDA_STAY_OPEN=1', // API mode
       '-e',
@@ -164,8 +168,6 @@ export default class DockerContainer {
       // Add `host.docker.internal` DNS name to access host from inside the container
       // https://github.com/docker/for-linux/issues/264
       const gatewayIp = await this.#getBridgeGatewayIp()
-      this.#dockerOptions.host = gatewayIp
-      console.log(`Adding host.docker.internal at ip: ${gatewayIp}`)
       if (gatewayIp) {
         dockerArgs.push('--add-host', `host.docker.internal:${gatewayIp}`)
       }
@@ -182,7 +184,6 @@ export default class DockerContainer {
       this.#handler,
     ])
 
-    console.log(`Creating container, ID: ${containerId}`)
     const dockerStart = execa('docker', ['start', '-a', containerId], {
       all: true,
     })
@@ -191,10 +192,10 @@ export default class DockerContainer {
       dockerStart.all.on('data', (data) => {
         const str = String(data)
         log.error(str)
-        console.log(`Getting data form data event: ${str}`)
-        const startUpString =
+
+        const startupString =
           "exec '/var/runtime/bootstrap' (cwd=/var/task, handler=)"
-        if (str.includes(startUpString)) {
+        if (str.includes(startupString)) {
           resolve()
         }
       })
@@ -213,12 +214,12 @@ export default class DockerContainer {
     // NOTE: `docker port` may output multiple lines.
     //
     // e.g.:
-    // 9001/tcp -> 0.0.0.0:49153
-    // 9001/tcp -> :::49153
+    // 8080/tcp -> 0.0.0.0:49153
+    // 8080/tcp -> :::49153
     //
     // Parse each line until it finds the mapped port.
     for (const line of dockerPortOutput.split('\n')) {
-      const result = line.match(/^9001\/tcp -> (.*):(\d+)$/)
+      const result = line.match(/^8080\/tcp -> (.*):(\d+)$/)
       if (result && result.length > 2) {
         ;[, , containerPort] = result
         break
@@ -228,18 +229,8 @@ export default class DockerContainer {
       throw new Error('Failed to get container port')
     }
 
-    console.log(`Retrieved container port: ${containerPort}`)
     this.#containerId = containerId
     this.#port = containerPort
-
-    await pRetry(() => this.#ping(), {
-      // default,
-      factor: 2,
-      // milliseconds
-      minTimeout: 10,
-      // default
-      retries: 10,
-    })
   }
 
   async #copyLocalLayer(layerArn, layerDir) {
@@ -397,23 +388,8 @@ export default class DockerContainer {
     return gateway.split('/')[0]
   }
 
-  async #ping() {
-    return 'ok'
-    // const url = `http://${this.#dockerOptions.host}:${this.#port} `
-    // console.log(`Pinging url: ${url}`)
-    // const res = await fetch(url)
-    // console.log(`Replied with:`)
-    // console.log(res.text())
-    // if (!res.ok) {
-    //   throw new Error(`Failed to fetch from ${url} with ${res.statusText}`)
-    // }
-    //
-    // return res.text()
-  }
-
   async request(event) {
-    const url = `http://${this.#dockerOptions.host}:${this.#port}/2015-03-31/functions/${this.#functionKey}/invocations`
-
+    const url = `http://${this.#gatewayAddress}:${this.#port}/2015-03-31/functions/function/invocations`
     const res = await fetch(url, {
       body: stringify(event),
       headers: { 'Content-Type': 'application/json' },
