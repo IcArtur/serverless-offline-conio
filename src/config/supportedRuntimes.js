@@ -7,7 +7,7 @@
 // ])
 
 // GO
-export const supportedGo = new Set(['go1.x', 'provided'])
+export const supportedGo = new Set(['go1.x'])
 
 // JAVA
 export const supportedJava = new Set(['java8', 'java8.al2', 'java11', 'java17'])
@@ -21,7 +21,7 @@ export const supportedNodejs = new Set([
 ])
 
 // PROVIDED
-export const supportedProvided = new Set(['provided', 'provided.al2'])
+export const supportedProvided = new Set(['provided.al2', 'provided.al2023'])
 
 // PYTHON
 export const supportedPython = new Set([

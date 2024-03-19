@@ -11,6 +11,7 @@ import pkg from 'fs-extra'
 import isWsl from 'is-wsl'
 import jszip from 'jszip'
 import DockerImage from './DockerImage.js'
+import { runtimesMap } from '../../../config/index.js'
 
 const { stringify } = JSON
 const { floor, log: mathLog } = Math
@@ -75,7 +76,7 @@ export default class DockerContainer {
   }
 
   #baseImage(runtime) {
-    return `public.ecr.aws/lambda/python:${runtime.replace('python', '')}`
+    return `public.ecr.aws/lambda/${runtimesMap[runtime]}`
   }
 
   async start(codeDir) {
@@ -88,19 +89,27 @@ export default class DockerContainer {
     if (!this.#dockerOptions.readOnly) {
       permissions = 'rw'
     }
+
+    let volumeSourcePath = codeDir
+    if (process.env.PROJECT_PATH) {
+      volumeSourcePath = process.env.PROJECT_PATH
+    }
+
     // https://github.com/serverless/serverless/blob/v1.57.0/lib/plugins/aws/invokeLocal/index.js#L291-L293
     const dockerArgs = [
       '-v',
-      `${codeDir}:/var/task:${permissions},delegated`,
+      `${volumeSourcePath}:/var/task:${permissions},delegated`,
       '-p',
       8080,
-      '-e',
-      'PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python',
       '-e',
       'DOCKER_LAMBDA_STAY_OPEN=1', // API mode
       '-e',
       'DOCKER_LAMBDA_WATCH=1', // Watch mode
     ]
+
+    if (this.#runtime.includes('python')) {
+      dockerArgs.push('-e', 'PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python')
+    }
 
     if (this.#layers.length > 0) {
       log.verbose(`Found layers, checking provider type`)
@@ -204,6 +213,16 @@ export default class DockerContainer {
         reject(err)
       })
     })
+
+    if (this.#runtime.includes('provided')) {
+      await execa('docker', [
+        'exec',
+        containerId,
+        'cp',
+        `/var/task/${this.#handler}`,
+        '/var/runtime/bootstrap',
+      ])
+    }
 
     // parse `docker port` output and get the container port
     let containerPort
