@@ -216,11 +216,9 @@ export default class DockerContainer {
 
     if (this.#runtime.includes('provided')) {
       await execa('docker', [
-        'exec',
-        containerId,
         'cp',
-        `/var/task/${this.#handler}`,
-        '/var/runtime/bootstrap',
+        `${codeDir}/bootstrap`,
+        `${containerId}:/var/runtime/bootstrap`,
       ])
     }
 
