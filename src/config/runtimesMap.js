@@ -11,8 +11,8 @@ export default {
   'nodejs18.x': 'nodejs:18',
   'nodejs20.x': 'nodejs:20',
 
-  provided: 'provided:latest',
   'provided.al2': 'provided:al2',
+  'provided.al2023': 'provided:al2023',
 
   'python3.7': 'python:3.7',
   'python3.8': 'python:3.8',
