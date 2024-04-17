@@ -450,7 +450,9 @@ export default class DockerContainer {
   }
 
   #getLayersSha256() {
-    return createHash('sha256').update(stringify([...this.#layers, this.#layersRandomness])).digest('hex')
+    return createHash('sha256')
+      .update(stringify([...this.#layers, this.#layersRandomness]))
+      .digest('hex')
   }
 
   get isRunning() {

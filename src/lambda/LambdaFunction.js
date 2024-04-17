@@ -144,6 +144,7 @@ export default class LambdaFunction {
         : undefined,
       handler,
       layers: functionDefinition.layers || [],
+      layersRandomness: Math.random(),
       provider,
       runtime: this.#runtime,
       serverlessPath,
@@ -153,7 +154,6 @@ export default class LambdaFunction {
         : undefined,
       servicePath: servicepath,
       timeout: this.#timeout,
-      layersRandomness: Math.random(),
     }
 
     this.#handlerRunner = new HandlerRunner(funOptions, options, env)
