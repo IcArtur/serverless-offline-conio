@@ -153,6 +153,7 @@ export default class LambdaFunction {
         : undefined,
       servicePath: servicepath,
       timeout: this.#timeout,
+      layersRandomness: Math.random(),
     }
 
     this.#handlerRunner = new HandlerRunner(funOptions, options, env)

@@ -50,6 +50,8 @@ export default class DockerContainer {
 
   #serviceLayers = null
 
+  #layersRandomness = null
+
   constructor(
     env,
     functionKey,
@@ -60,6 +62,7 @@ export default class DockerContainer {
     servicePath,
     dockerOptions,
     serviceLayers,
+    layersRandomness,
   ) {
     this.#dockerOptions = dockerOptions
     this.#env = env
@@ -73,6 +76,7 @@ export default class DockerContainer {
     this.#runtime = runtime
     this.#servicePath = servicePath
     this.#serviceLayers = serviceLayers
+    this.#layersRandomness = layersRandomness
   }
 
   #baseImage(runtime) {
@@ -446,7 +450,7 @@ export default class DockerContainer {
   }
 
   #getLayersSha256() {
-    return createHash('sha256').update(stringify(this.#layers)).digest('hex')
+    return createHash('sha256').update(stringify([...this.#layers, this.#layersRandomness])).digest('hex')
   }
 
   get isRunning() {
