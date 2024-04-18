@@ -70,7 +70,7 @@ export default class DockerContainer {
     this.#functionKey = functionKey
     this.#gatewayAddress = process.env.GATEWAY_ADDRESS
     this.#handler = handler
-    this.#imageNameTag = (image) ? image : this.#defaultImage(runtime)
+    this.#imageNameTag = image || this.#defaultImage(runtime)
     this.#image = new DockerImage(this.#imageNameTag)
     this.#layers = layers
     this.#provider = provider

@@ -75,7 +75,12 @@ export default class LambdaFunction {
     // TODO FIXME look into better way to work with serverless-webpack
     const servicepath = resolve(servicePath, options.location ?? '')
 
-    const { handler, image, name, package: functionPackage = {} } = functionDefinition
+    const {
+      handler,
+      image,
+      name,
+      package: functionPackage = {},
+    } = functionDefinition
 
     // this._executionTimeout = null
     this.#functionKey = functionKey
