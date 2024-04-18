@@ -324,8 +324,8 @@ export default class ServerlessOffline {
           const httpEvent = {
             functionKey,
             handler: functionDefinition.handler,
-            imageCommand: functionDefinition.image?.command?.join(' '),
             http,
+            imageCommand: functionDefinition.image?.command?.join(' '),
           }
 
           httpEvents.push(httpEvent)
@@ -338,8 +338,8 @@ export default class ServerlessOffline {
           const httpApiEvent = {
             functionKey,
             handler: functionDefinition.handler,
-            imageCommand: functionDefinition.image?.command?.join(' '),
             http: httpApi,
+            imageCommand: functionDefinition.image?.command?.join(' '),
           }
 
           // Ensure definitions for 'httpApi' events are objects so that they can be marked

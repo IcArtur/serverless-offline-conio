@@ -80,7 +80,7 @@ export default class DockerContainer {
     this.#layersRandomness = layersRandomness
 
     if (imageConfig.command) {
-      this.#handler = image.command.join(' ')
+      this.#handler = imageConfig.command.join(' ')
     }
   }
 
