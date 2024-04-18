@@ -35,15 +35,15 @@ export default class Http {
     await this.#httpServer.createServer()
   }
 
-  #createEvent(functionKey, rawHttpEventDefinition, handler) {
+  #createEvent(functionKey, rawHttpEventDefinition, handler, imageCommand) {
     const httpEvent = new HttpEventDefinition(rawHttpEventDefinition)
 
-    this.#httpServer.createRoutes(functionKey, httpEvent, handler)
+    this.#httpServer.createRoutes(functionKey, httpEvent, handler, imageCommand)
   }
 
   create(events) {
-    events.forEach(({ functionKey, handler, http }) => {
-      this.#createEvent(functionKey, http, handler)
+    events.forEach(({ functionKey, handler, http, imageCommand }) => {
+      this.#createEvent(functionKey, http, handler, imageCommand)
     })
 
     this.#httpServer.writeRoutesTerminal()

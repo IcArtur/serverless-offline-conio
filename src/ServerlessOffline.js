@@ -320,20 +320,22 @@ export default class ServerlessOffline {
           })
         }
 
-        if (http && functionDefinition.handler) {
+        if (http && (functionDefinition.handler || functionDefinition.image)) {
           const httpEvent = {
             functionKey,
             handler: functionDefinition.handler,
+            imageCommand: functionDefinition.image?.command?.join(' '),
             http,
           }
 
           httpEvents.push(httpEvent)
         }
 
-        if (httpApi && functionDefinition.handler) {
+        if (httpApi && (functionDefinition.handler || functionDefinition.image)) {
           const httpApiEvent = {
             functionKey,
             handler: functionDefinition.handler,
+            imageCommand: functionDefinition.image?.command?.join(' '),
             http: httpApi,
           }
 

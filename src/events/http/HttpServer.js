@@ -919,7 +919,7 @@ export default class HttpServer {
     }
   }
 
-  createRoutes(functionKey, httpEvent, handler) {
+  createRoutes(functionKey, httpEvent, handler, imageCommand) {
     if (!this.#hasPrivateHttpEvent && httpEvent.private) {
       this.#hasPrivateHttpEvent = true
 
@@ -972,7 +972,7 @@ export default class HttpServer {
       hapiPath = generateHapiPath(path, this.#options, this.#serverless)
     }
 
-    const [handlerPath] = splitHandlerPathAndName(handler)
+    const [handlerPath] = splitHandlerPathAndName(handler || imageCommand || 'function')
 
     const endpoint = new Endpoint(
       join(this.#serverless.config.servicePath, handlerPath),

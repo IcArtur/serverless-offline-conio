@@ -56,7 +56,7 @@ export default class DockerContainer {
     env,
     functionKey,
     handler,
-    image,
+    imageConfig,
     runtime,
     layers,
     provider,
@@ -70,7 +70,7 @@ export default class DockerContainer {
     this.#functionKey = functionKey
     this.#gatewayAddress = process.env.GATEWAY_ADDRESS
     this.#handler = handler
-    this.#imageNameTag = image || this.#defaultImage(runtime)
+    this.#imageNameTag = imageConfig?.uri || this.#defaultImage(runtime)
     this.#image = new DockerImage(this.#imageNameTag)
     this.#layers = layers
     this.#provider = provider
@@ -78,6 +78,10 @@ export default class DockerContainer {
     this.#servicePath = servicePath
     this.#serviceLayers = serviceLayers
     this.#layersRandomness = layersRandomness
+
+    if (imageConfig.command) {
+      this.#handler = image.command.join(' ')
+    }
   }
 
   #defaultImage(runtime) {
