@@ -331,7 +331,10 @@ export default class ServerlessOffline {
           httpEvents.push(httpEvent)
         }
 
-        if (httpApi && (functionDefinition.handler || functionDefinition.image)) {
+        if (
+          httpApi &&
+          (functionDefinition.handler || functionDefinition.image)
+        ) {
           const httpApiEvent = {
             functionKey,
             handler: functionDefinition.handler,

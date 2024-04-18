@@ -972,7 +972,9 @@ export default class HttpServer {
       hapiPath = generateHapiPath(path, this.#options, this.#serverless)
     }
 
-    const [handlerPath] = splitHandlerPathAndName(handler || imageCommand || 'function')
+    const [handlerPath] = splitHandlerPathAndName(
+      handler || imageCommand || 'function',
+    )
 
     const endpoint = new Endpoint(
       join(this.#serverless.config.servicePath, handlerPath),
