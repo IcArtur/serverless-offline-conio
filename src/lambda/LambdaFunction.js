@@ -43,6 +43,8 @@ export default class LambdaFunction {
 
   #idleTimeStarted = null
 
+  #image = null
+
   #initialized = false
 
   #lambdaContext = null
@@ -73,12 +75,14 @@ export default class LambdaFunction {
     // TODO FIXME look into better way to work with serverless-webpack
     const servicepath = resolve(servicePath, options.location ?? '')
 
-    const { handler, name, package: functionPackage = {} } = functionDefinition
+    const { handler, image, name, package: functionPackage = {} } = functionDefinition
 
     // this._executionTimeout = null
     this.#functionKey = functionKey
     this.#functionName = name
     this.#handler = handler
+
+    this.#image = image
 
     this.#memorySize =
       functionDefinition.memorySize ??
@@ -143,6 +147,7 @@ export default class LambdaFunction {
         ? resolve(servicepath, functionPackage.artifact)
         : undefined,
       handler,
+      image: this.#image,
       layers: functionDefinition.layers || [],
       layersRandomness: Math.random(),
       provider,

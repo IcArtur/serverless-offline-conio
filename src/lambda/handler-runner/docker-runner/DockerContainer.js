@@ -56,6 +56,7 @@ export default class DockerContainer {
     env,
     functionKey,
     handler,
+    image,
     runtime,
     layers,
     provider,
@@ -69,7 +70,7 @@ export default class DockerContainer {
     this.#functionKey = functionKey
     this.#gatewayAddress = process.env.GATEWAY_ADDRESS
     this.#handler = handler
-    this.#imageNameTag = this.#baseImage(runtime)
+    this.#imageNameTag = (image) ? image : this.#defaultImage(runtime)
     this.#image = new DockerImage(this.#imageNameTag)
     this.#layers = layers
     this.#provider = provider
@@ -79,7 +80,7 @@ export default class DockerContainer {
     this.#layersRandomness = layersRandomness
   }
 
-  #baseImage(runtime) {
+  #defaultImage(runtime) {
     return `public.ecr.aws/lambda/${runtimesMap[runtime]}`
   }
 
