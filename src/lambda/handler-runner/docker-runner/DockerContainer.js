@@ -211,8 +211,7 @@ export default class DockerContainer {
         const str = String(data)
         log.error(str)
 
-        const startupString =
-          "exec '/var/runtime/bootstrap' (cwd=/var/task, handler=)"
+        const startupString = "(rapid) exec '/"
         if (str.includes(startupString)) {
           resolve()
         }
